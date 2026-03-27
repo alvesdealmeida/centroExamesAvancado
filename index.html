@@ -1,0 +1,261 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Academic Pro - Ultimate Edition</title>
+    <style>
+        :root { 
+            --navy: #0f172a; --slate: #64748b; --emerald: #10b981; 
+            --bg: #f8fafc; --accent: #3b82f6; --danger: #ef4444; --gold: #f59e0b; 
+        }
+        * { box-sizing: border-box; touch-action: manipulation; -webkit-user-select: none; }
+        
+        body { 
+            background: var(--bg); color: var(--navy); font-family: 'Inter', sans-serif; 
+            margin: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; overflow: hidden;
+        }
+
+        header { 
+            width: 100%; background: var(--navy); color: white; padding: 10px 15px; 
+            display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; 
+        }
+        
+        /* Botão Desistir */
+        .btn-quit {
+            background: rgba(239, 68, 68, 0.2); border: 1px solid var(--danger);
+            color: #fca5a5; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+            font-weight: bold; text-transform: uppercase; font-size: 0.6rem;
+        }
+
+        #stats-bar { 
+            display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 500px; 
+            background: white; padding: 8px 15px; border-bottom: 1px solid #e2e8f0; 
+            font-size: 0.75rem; font-weight: 800;
+        }
+
+        #game-viewport { 
+            position: relative; width: 95%; max-width: 450px; height: 35vh; 
+            background: white; border: 1px solid #e2e8f0; border-radius: 8px; 
+            margin: 10px; overflow: hidden; transition: filter 0.3s ease;
+        }
+        .paused-state { filter: blur(10px); pointer-events: none; }
+        
+        #pause-indicator {
+            position: absolute; inset: 0; background: rgba(15, 23, 42, 0.6);
+            display: none; align-items: center; justify-content: center; color: white; z-index: 100;
+        }
+
+        .problem-node { 
+            position: absolute; width: 125px; padding: 12px; background: white; 
+            border: 2px solid var(--navy); border-radius: 6px; text-align: center;
+            font-size: 0.85rem; font-weight: 700; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        #input-area { 
+            font-size: 2.5rem; color: var(--navy); margin: 5px 0; 
+            border-bottom: 3px solid var(--navy); min-height: 55px; width: 80%; 
+            text-align: center; font-weight: 200;
+        }
+        
+        #numpad { 
+            display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; 
+            max-width: 450px; background: #cbd5e1; margin-top: auto; gap: 1px; 
+        }
+        .key { background: white; border: none; padding: 18px; font-size: 1.5rem; color: var(--navy); }
+        .key:active { background: #f1f5f9; }
+
+        .full-overlay { 
+            position: fixed; inset: 0; background: var(--bg); z-index: 2000; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+        }
+        .card { 
+            background: white; border: 1px solid #e2e8f0; border-radius: 12px; 
+            padding: 25px; width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); 
+        }
+        .btn-mode { 
+            width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #e2e8f0; 
+            border-radius: 8px; background: white; cursor: pointer; font-weight: 600; text-align: left;
+        }
+
+        .medal { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; margin: 2px; border: 1px solid #eee; opacity: 0.3; }
+        .medal-active { opacity: 1; background: #fffbeb; border-color: var(--gold); color: #92400e; font-weight: bold; }
+        .diag-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f8fafc; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen" class="full-overlay">
+        <div class="card">
+            <h2 style="text-align:center; margin-top:0;">CENTRO DE EXAMES</h2>
+            <button class="btn-mode" onclick="init('all')">🎓 Exame Multidisciplinar</button>
+            <button class="btn-mode" onclick="init('arithmetic')">🔢 Aritmética</button>
+            <button class="btn-mode" onclick="init('algebra')">x¹ Álgebra</button>
+            <button class="btn-mode" onclick="init('geometry')">📐 Geometria</button>
+            <button class="btn-mode" onclick="init('trigonometry')">𝜃 Trigonometria</button>
+        </div>
+    </div>
+
+    <div id="end-screen" class="full-overlay" style="display:none">
+        <div class="card">
+            <h3 style="margin:0;">RELATÓRIO ACADÊMICO</h3>
+            <div id="medal-container" style="margin:10px 0; text-align:center"></div>
+            <div id="diag-results"></div>
+            <p id="final-advice" style="font-size:0.75rem; padding:10px; background:#eff6ff; border-radius:6px; color:#1e40af; margin:15px 0"></p>
+            <button onclick="location.reload()" style="width:100%; padding:15px; background:var(--navy); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer">VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <header>
+        <button class="btn-quit" onclick="abortSession()">Desistir</button>
+        <span id="label-mode">SESSÃO: -</span>
+        <div id="timer-display">00:00</div>
+    </header>
+
+    <div id="stats-bar">
+        <div>SCORE: <span id="ui-score" style="color:var(--accent)">0</span></div>
+        <div style="text-align:right">ERROS: <span id="ui-errors" style="color:var(--danger)">0</span>/5</div>
+    </div>
+
+    <div id="game-viewport">
+        <div id="pause-indicator"><h3>PAUSADO (ESC)</h3></div>
+    </div>
+
+    <div id="input-area"></div>
+
+    <div id="numpad">
+        <button class="key" onclick="tap(1)">1</button><button class="key" onclick="tap(2)">2</button><button class="key" onclick="tap(3)">3</button>
+        <button class="key" onclick="tap(4)">4</button><button class="key" onclick="tap(5)">5</button><button class="key" onclick="tap(6)">6</button>
+        <button class="key" onclick="tap(7)">7</button><button class="key" onclick="tap(8)">8</button><button class="key" onclick="tap(9)">9</button>
+        <button class="key" onclick="tap('C')" style="color:var(--slate)">C</button><button class="key" onclick="tap(0)">0</button><button class="key" onclick="tap('.')">.</button>
+    </div>
+
+    <script>
+        const viewport = document.getElementById('game-viewport');
+        const inputArea = document.getElementById('input-area');
+        let mode = 'all', score = 0, errors = 0, level = 1, speed = 0.55;
+        let nodes = [], input = "", isLive = false, isPaused = false, startTime = 0;
+        
+        let stats = {
+            arithmetic: { fails: 0, streak: 0, earned: false, icon: "🔢" },
+            algebra: { fails: 0, streak: 0, earned: false, icon: "x¹" },
+            geometry: { fails: 0, streak: 0, earned: false, icon: "📐" },
+            trigonometry: { fails: 0, streak: 0, earned: false, icon: "𝜃" }
+        };
+
+        window.onkeydown = (e) => {
+            if (e.key === "Escape" && isLive) togglePause();
+        };
+
+        function togglePause() {
+            isPaused = !isPaused;
+            viewport.classList.toggle('paused-state', isPaused);
+            document.getElementById('pause-indicator').style.display = isPaused ? 'flex' : 'none';
+        }
+
+        function abortSession() {
+            if(confirm("Deseja interromper o exame e ver os resultados atuais?")) conclude();
+        }
+
+        function init(m) {
+            mode = m;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('label-mode').innerText = "SESSÃO: " + m.toUpperCase();
+            isLive = true; startTime = Date.now();
+            spawn(); loop();
+        }
+
+        function generate() {
+            const types = ['arithmetic', 'algebra', 'geometry', 'trigonometry'];
+            let t = mode === 'all' ? types[Math.min(Math.floor(Math.random() * level), 3)] : mode;
+            let text, ans;
+            if(t==='arithmetic') { let a=r(10,50), b=r(10,50); text=`${a} + ${b}`; ans=a+b; }
+            else if(t==='algebra') { let x=r(2,10), m=r(2,4); text=`${m}x = ${m*x}<br>x=?`; ans=x; }
+            else if(t==='geometry') { let l=r(4,9); text=`Área Quadrado<br>Lado: ${l}`; ans=l*l; }
+            else { text=`sen(30°)`; ans=0.5; }
+            return { text, ans, type: t };
+        }
+
+        function tap(v) {
+            if(isPaused || !isLive) return;
+            if(v==='C') input = "";
+            else if(v==='.') { if(!input.includes('.')) input += '.'; }
+            else if(input.length < 5) input += v;
+            inputArea.innerText = input;
+
+            let idx = nodes.findIndex(n => n.ans.toString() === input);
+            if(idx !== -1) {
+                let n = nodes[idx];
+                stats[n.type].streak++;
+                if(stats[n.type].streak >= 5) stats[n.type].earned = true;
+                viewport.removeChild(n.el);
+                nodes.splice(idx, 1);
+                score += 25;
+                if(score % 250 === 0) { level++; speed += 0.1; }
+                document.getElementById('ui-score').innerText = score;
+                input = ""; inputArea.innerText = "";
+            }
+        }
+
+        function spawn() {
+            if(!isLive) return;
+            if(!isPaused) {
+                let p = generate();
+                let div = document.createElement('div');
+                div.className = 'problem-node';
+                div.innerHTML = p.text;
+                div.style.left = r(5, viewport.clientWidth - 130) + "px";
+                div.style.top = "-70px";
+                viewport.appendChild(div);
+                nodes.push({ el: div, ans: p.ans, type: p.type, y: -70 });
+            }
+            setTimeout(spawn, Math.max(1200, 4800 - (level * 400)));
+        }
+
+        function loop() {
+            if(!isLive) return;
+            if(!isPaused) {
+                for(let i=nodes.length-1; i>=0; i--) {
+                    nodes[i].y += speed;
+                    nodes[i].el.style.top = nodes[i].y + "px";
+                    if(nodes[i].y > viewport.clientHeight) {
+                        errors++;
+                        stats[nodes[i].type].fails++;
+                        stats[nodes[i].type].streak = 0;
+                        document.getElementById('ui-errors').innerText = errors;
+                        viewport.removeChild(nodes[i].el);
+                        nodes.splice(i, 1);
+                        if(errors >= 5) conclude();
+                    }
+                }
+            }
+            requestAnimationFrame(loop);
+        }
+
+        function conclude() {
+            isLive = false;
+            document.getElementById('end-screen').style.display = 'flex';
+            let medalBox = document.getElementById('medal-container');
+            let diagBox = document.getElementById('diag-results');
+            medalBox.innerHTML = ""; diagBox.innerHTML = "<h4>Status por Disciplina:</h4>";
+            let worst = "arithmetic", maxFail = -1;
+            for(let k in stats) {
+                let active = stats[k].earned ? "medal-active" : "";
+                medalBox.innerHTML += `<span class="medal ${active}">${stats[k].icon} ${k.toUpperCase()}</span>`;
+                diagBox.innerHTML += `<div class="diag-row"><span>${k}</span><span>${stats[k].fails} erros</span></div>`;
+                if(stats[k].fails > maxFail) { maxFail = stats[k].fails; worst = k; }
+            }
+            document.getElementById('final-advice').innerText = `RECOMENDAÇÃO: Seu histórico sugere foco em ${worst.toUpperCase()} para a próxima certificação.`;
+        }
+
+        function r(min, max) { return Math.floor(Math.random() * (max - min + 1) + min); }
+        setInterval(() => { 
+            if(isLive && !isPaused) {
+                let d = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById('timer-display').innerText = `${Math.floor(d/60).toString().padStart(2,'0')}:${(d%60).toString().padStart(2,'0')}`;
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
+         
